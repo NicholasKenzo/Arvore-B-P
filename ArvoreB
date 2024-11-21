@@ -1,0 +1,156 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define MAX_KEY_LENGTH 100
+#define B_TREE_ORDER 3
+
+// Estrutura de dados para a Árvore B
+typedef struct BTreeNode {
+    char *keys[B_TREE_ORDER - 1];
+    struct BTreeNode *children[B_TREE_ORDER];
+    int num_keys;
+    bool is_leaf;
+} BTreeNode;
+
+// Funções da Árvore B
+BTreeNode* createBTreeNode(bool is_leaf) {
+    BTreeNode *newNode = (BTreeNode *)malloc(sizeof(BTreeNode));
+    newNode->num_keys = 0;
+    newNode->is_leaf = is_leaf;
+    for (int i = 0; i < B_TREE_ORDER; i++) {
+        newNode->children[i] = NULL;
+    }
+    return newNode;
+}
+
+void insertBTreeWord(BTreeNode **root, const char *word) {
+    BTreeNode *r = *root;
+    if (r->num_keys == B_TREE_ORDER - 1) {  // Se a raiz estiver cheia
+        BTreeNode *newNode = createBTreeNode(false);
+        newNode->children[0] = r;
+        *root = newNode;
+        // Dividir a raiz
+        insertBTreeSplit(*root, 0);
+    }
+    insertBTreeNonFull(*root, word);
+}
+
+void insertBTreeSplit(BTreeNode *node, int i) {
+    BTreeNode *y = node->children[i];
+    BTreeNode *z = createBTreeNode(y->is_leaf);
+    node->children[i + 1] = z;
+    
+    for (int j = node->num_keys; j > i; j--) {
+        node->children[j + 1] = node->children[j];
+    }
+
+    node->children[i + 1] = z;
+    
+    for (int j = y->num_keys / 2; j < y->num_keys; j++) {
+        z->keys[j - y->num_keys / 2] = y->keys[j];
+        y->num_keys--;
+    }
+
+    node->num_keys++;
+}
+
+void insertBTreeNonFull(BTreeNode *node, const char *word) {
+    int i = node->num_keys - 1;
+    if (node->is_leaf) {
+        while (i >= 0 && strcmp(word, node->keys[i]) < 0) {
+            i--;
+        }
+        node->keys[i + 1] = strdup(word);
+        node->num_keys++;
+    } else {
+        while (i >= 0 && strcmp(word, node->keys[i]) < 0) {
+            i--;
+        }
+        i++;
+        if (node->children[i]->num_keys == B_TREE_ORDER - 1) {
+            insertBTreeSplit(node, i);
+            if (strcmp(word, node->keys[i]) > 0) {
+                i++;
+            }
+        }
+        insertBTreeNonFull(node->children[i], word);
+    }
+}
+
+int searchBTreeWord(BTreeNode *root, const char *word) {
+    int i = 0;
+    while (i < root->num_keys && strcmp(word, root->keys[i]) > 0) {
+        i++;
+    }
+
+    if (i < root->num_keys && strcmp(word, root->keys[i]) == 0) {
+        return 1;  // Palavra encontrada
+    }
+
+    if (root->is_leaf) {
+        return 0;  // Palavra não encontrada
+    }
+
+    return searchBTreeWord(root->children[i], word);
+}
+
+void printBTreeSuggestions(BTreeNode *root, const char *prefix) {
+    if (root == NULL) return;
+
+    for (int i = 0; i < root->num_keys; i++) {
+        if (strstr(root->keys[i], prefix) == root->keys[i]) {
+            printf("%s\n", root->keys[i]);
+        }
+    }
+
+    for (int i = 0; i < root->num_keys + 1; i++) {
+        printBTreeSuggestions(root->children[i], prefix);
+    }
+}
+
+void suggestBTreeWords(BTreeNode *root, const char *prefix) {
+    printBTreeSuggestions(root, prefix);
+}
+
+// Função Principal
+int main() {
+    BTreeNode *bTreeRoot = createBTreeNode(true);
+    int choice;
+    char word[MAX_KEY_LENGTH];
+    char prefix[MAX_KEY_LENGTH];
+
+    while (1) {
+        printf("\nEscolha uma opção:\n");
+        printf("1. Inserir palavra (B-Tree)\n");
+        printf("2. Buscar palavra (B-Tree)\n");
+        printf("3. Sugerir palavras (B-Tree)\n");
+        printf("4. Sair\n");
+
+        scanf("%d", &choice);
+        switch (choice) {
+            case 1:
+                printf("Digite a palavra para inserir: ");
+                scanf("%s", word);
+                insertBTreeWord(&bTreeRoot, word);
+                break;
+            case 2:
+                printf("Digite a palavra para buscar: ");
+                scanf("%s", word);
+                printf("Busca: %s\n", searchBTreeWord(bTreeRoot, word) ? "Encontrada" : "Não encontrada");
+                break;
+            case 3:
+                printf("Digite o prefixo para sugerir palavras: ");
+                scanf("%s", prefix);
+                printf("Sugestões para '%s':\n", prefix);
+                suggestBTreeWords(bTreeRoot, prefix);
+                break;
+            case 4:
+                printf("Saindo...\n");
+                return 0;
+            default:
+                printf("Opção inválida!\n");
+        }
+    }
+}
