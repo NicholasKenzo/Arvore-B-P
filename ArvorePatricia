@@ -134,6 +134,22 @@ void suggestPatriciaWords(PatriciaNode *root, const char *prefix, char *buffer, 
     suggestPatriciaWords(root->right, prefix, buffer, depth);
 }
 
+// Função para ler palavras de um arquivo e inseri-las na árvore Patricia
+void readWordsFromFile(const char *filename, PatriciaNode **root) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Erro ao abrir o arquivo '%s'.\n", filename);
+        return;
+    }
+
+    char word[100];
+    while (fscanf(file, "%s", word) != EOF) {
+        *root = insertPatricia(*root, word);
+    }
+
+    fclose(file);
+}
+
 // Função principal para interagir com o usuário
 int main() {
     PatriciaNode *root = NULL;
@@ -141,6 +157,9 @@ int main() {
     char prefix[100];
     char buffer[100];
     int choice;
+
+ // Ler palavras de um arquivo e inserir na árvore
+    readWordsFromFile("dicionario.txt", &root);
 
     while (1) {
         printf("\nEscolha uma opção:\n");
