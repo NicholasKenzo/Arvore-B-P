@@ -1,152 +1,229 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
-#define MAX_KEY_LENGTH 100
-#define B_TREE_ORDER 3
+#define MAX_KEYS 3 // Ordem da árvore B (número máximo de chaves por nó)
 
-// Estrutura de dados para a Árvore B
 typedef struct BTreeNode {
-    char *keys[B_TREE_ORDER - 1];
-    struct BTreeNode *children[B_TREE_ORDER];
-    int num_keys;
-    bool is_leaf;
+    char *keys[MAX_KEYS];        // Chaves armazenadas (palavras)
+    struct BTreeNode *children[MAX_KEYS + 1]; // Filhos do nó
+    int numKeys;                 // Número atual de chaves no nó
+    int isLeaf;                  // Indica se o nó é folha
 } BTreeNode;
 
-// Funções da Árvore B
-BTreeNode* createBTreeNode(bool is_leaf) {
-    BTreeNode *newNode = (BTreeNode *)malloc(sizeof(BTreeNode));
-    newNode->num_keys = 0;
-    newNode->is_leaf = is_leaf;
-    for (int i = 0; i < B_TREE_ORDER; i++) {
-        newNode->children[i] = NULL;
+// Função para criar um novo nó
+BTreeNode* createBTreeNode(int isLeaf) {
+    BTreeNode *node = (BTreeNode *)malloc(sizeof(BTreeNode));
+    node->numKeys = 0;
+    node->isLeaf = isLeaf;
+    for (int i = 0; i < MAX_KEYS + 1; i++) {
+        node->children[i] = NULL;
     }
-    return newNode;
+    return node;
 }
 
-void insertBTreeWord(BTreeNode **root, const char *word) {
-    BTreeNode *r = *root;
-    if (r->num_keys == B_TREE_ORDER - 1) {  // Se a raiz estiver cheia
-        BTreeNode *newNode = createBTreeNode(false);
-        newNode->children[0] = r;
-        *root = newNode;
-        // Dividir a raiz
-        insertBTreeSplit(*root, 0);
+// Função para dividir um nó cheio
+void splitChild(BTreeNode *parent, int i) {
+    BTreeNode *fullChild = parent->children[i];
+    BTreeNode *newChild = createBTreeNode(fullChild->isLeaf);
+
+    newChild->numKeys = MAX_KEYS / 2;
+
+    // Copia as últimas chaves para o novo nó
+    for (int j = 0; j < MAX_KEYS / 2; j++) {
+        newChild->keys[j] = fullChild->keys[j + MAX_KEYS / 2 + 1];
     }
-    insertBTreeNonFull(*root, word);
+
+    if (!fullChild->isLeaf) {
+        // Copia os filhos também
+        for (int j = 0; j <= MAX_KEYS / 2; j++) {
+            newChild->children[j] = fullChild->children[j + MAX_KEYS / 2 + 1];
+        }
+    }
+
+    fullChild->numKeys = MAX_KEYS / 2;
+
+    // Move os filhos do pai para dar espaço
+    for (int j = parent->numKeys; j >= i + 1; j--) {
+        parent->children[j + 1] = parent->children[j];
+    }
+    parent->children[i + 1] = newChild;
+
+    // Move as chaves do pai para dar espaço
+    for (int j = parent->numKeys - 1; j >= i; j--) {
+        parent->keys[j + 1] = parent->keys[j];
+    }
+    parent->keys[i] = fullChild->keys[MAX_KEYS / 2];
+    parent->numKeys++;
 }
 
-void insertBTreeSplit(BTreeNode *node, int i) {
-    BTreeNode *y = node->children[i];
-    BTreeNode *z = createBTreeNode(y->is_leaf);
-    node->children[i + 1] = z;
-    
-    for (int j = node->num_keys; j > i; j--) {
-        node->children[j + 1] = node->children[j];
+// Função auxiliar para buscar uma palavra em um nó
+int searchInNode(BTreeNode *node, const char *key) {
+    for (int i = 0; i < node->numKeys; i++) {
+        if (strcmp(node->keys[i], key) == 0) {
+            return 1; // Palavra encontrada
+        }
     }
-
-    node->children[i + 1] = z;
-    
-    for (int j = y->num_keys / 2; j < y->num_keys; j++) {
-        z->keys[j - y->num_keys / 2] = y->keys[j];
-        y->num_keys--;
-    }
-
-    node->num_keys++;
+    return 0; // Palavra não encontrada
 }
 
-void insertBTreeNonFull(BTreeNode *node, const char *word) {
-    int i = node->num_keys - 1;
-    if (node->is_leaf) {
-        while (i >= 0 && strcmp(word, node->keys[i]) < 0) {
+// Função para buscar uma palavra na Árvore B
+int searchBTree(BTreeNode *root, const char *key) {
+    if (!root) {
+        return 0; // Árvore vazia
+    }
+
+    int i = 0;
+    while (i < root->numKeys && strcmp(key, root->keys[i]) > 0) {
+        i++;
+    }
+
+    if (i < root->numKeys && strcmp(key, root->keys[i]) == 0) {
+        return 1; // Palavra encontrada no nó atual
+    }
+
+    if (root->isLeaf) {
+        return 0; // Palavra não encontrada
+    }
+
+    return searchBTree(root->children[i], key); // Busca no filho correspondente
+}
+
+// Função para inserir uma palavra em um nó não cheio
+void insertNonFull(BTreeNode *node, const char *key) {
+    int i = node->numKeys - 1;
+
+    if (node->isLeaf) {
+        // Insere a palavra no local correto
+        while (i >= 0 && strcmp(key, node->keys[i]) < 0) {
+            node->keys[i + 1] = node->keys[i];
             i--;
         }
-        node->keys[i + 1] = strdup(word);
-        node->num_keys++;
+        node->keys[i + 1] = strdup(key);
+        node->numKeys++;
     } else {
-        while (i >= 0 && strcmp(word, node->keys[i]) < 0) {
+        // Encontra o filho onde a palavra deve ser inserida
+        while (i >= 0 && strcmp(key, node->keys[i]) < 0) {
             i--;
         }
         i++;
-        if (node->children[i]->num_keys == B_TREE_ORDER - 1) {
-            insertBTreeSplit(node, i);
-            if (strcmp(word, node->keys[i]) > 0) {
+
+        if (node->children[i]->numKeys == MAX_KEYS) {
+            // Divide o filho se estiver cheio
+            splitChild(node, i);
+            if (strcmp(key, node->keys[i]) > 0) {
                 i++;
             }
         }
-        insertBTreeNonFull(node->children[i], word);
+
+        insertNonFull(node->children[i], key);
     }
 }
 
-int searchBTreeWord(BTreeNode *root, const char *word) {
-    int i = 0;
-    while (i < root->num_keys && strcmp(word, root->keys[i]) > 0) {
-        i++;
+// Função principal para inserir uma palavra na Árvore B
+void insertBTree(BTreeNode **root, const char *key) {
+    if (*root == NULL) {
+        *root = createBTreeNode(1); // Cria a raiz se não existir
     }
 
-    if (i < root->num_keys && strcmp(word, root->keys[i]) == 0) {
-        return 1;  // Palavra encontrada
+    if ((*root)->numKeys == MAX_KEYS) {
+        // Divide a raiz se estiver cheia
+        BTreeNode *newRoot = createBTreeNode(0);
+        newRoot->children[0] = *root;
+        splitChild(newRoot, 0);
+        insertNonFull(newRoot, key);
+        *root = newRoot;
+    } else {
+        insertNonFull(*root, key);
     }
-
-    if (root->is_leaf) {
-        return 0;  // Palavra não encontrada
-    }
-
-    return searchBTreeWord(root->children[i], word);
 }
 
-void printBTreeSuggestions(BTreeNode *root, const char *prefix) {
-    if (root == NULL) return;
+// Função para sugerir palavras baseadas no prefixo
+void suggestBTreeWords(BTreeNode *root, const char *prefix, char *buffer, int depth) {
+    if (!root) {
+        return;
+    }
 
-    for (int i = 0; i < root->num_keys; i++) {
-        if (strstr(root->keys[i], prefix) == root->keys[i]) {
-            printf("%s\n", root->keys[i]);
+    for (int i = 0; i < root->numKeys; i++) {
+        // Copiar a chave no buffer
+        strncpy(buffer + depth, root->keys[i], strlen(root->keys[i]));
+        depth += strlen(root->keys[i]);
+
+        // Se a chave começar com o prefixo
+        if (strncmp(buffer, prefix, strlen(prefix)) == 0) {
+            printf("%s\n", buffer);
         }
+
+        // Recursão para filhos
+        if (!root->isLeaf) {
+            suggestBTreeWords(root->children[i], prefix, buffer, depth);
+        }
+
+        // Resetar o buffer de volta
+        depth -= strlen(root->keys[i]);
     }
 
-    for (int i = 0; i < root->num_keys + 1; i++) {
-        printBTreeSuggestions(root->children[i], prefix);
+    if (!root->isLeaf) {
+        suggestBTreeWords(root->children[root->numKeys], prefix, buffer, depth);
     }
 }
 
-void suggestBTreeWords(BTreeNode *root, const char *prefix) {
-    printBTreeSuggestions(root, prefix);
+// Função para imprimir as palavras em ordem lexicográfica
+void printBTree(BTreeNode *root) {
+    if (!root) {
+        return;
+    }
+
+    for (int i = 0; i < root->numKeys; i++) {
+        if (!root->isLeaf) {
+            printBTree(root->children[i]);
+        }
+        printf("%s\n", root->keys[i]);
+    }
+
+    if (!root->isLeaf) {
+        printBTree(root->children[root->numKeys]);
+    }
 }
 
-// Função Principal
+// Função principal para interagir com o usuário
 int main() {
-    BTreeNode *bTreeRoot = createBTreeNode(true);
+    BTreeNode *root = NULL;
+    char word[100];
+    char prefix[100];
+    char buffer[100];
     int choice;
-    char word[MAX_KEY_LENGTH];
-    char prefix[MAX_KEY_LENGTH];
 
     while (1) {
         printf("\nEscolha uma opção:\n");
-        printf("1. Inserir palavra (B-Tree)\n");
-        printf("2. Buscar palavra (B-Tree)\n");
-        printf("3. Sugerir palavras (B-Tree)\n");
-        printf("4. Sair\n");
-
+        printf("1. Inserir palavra\n");
+        printf("2. Buscar palavra\n");
+        printf("3. Sugerir palavras (autocompletar)\n");
+        printf("4. Exibir palavras\n");
+        printf("5. Sair\n");
         scanf("%d", &choice);
         switch (choice) {
             case 1:
                 printf("Digite a palavra para inserir: ");
                 scanf("%s", word);
-                insertBTreeWord(&bTreeRoot, word);
+                insertBTree(&root, word);
                 break;
             case 2:
                 printf("Digite a palavra para buscar: ");
                 scanf("%s", word);
-                printf("Busca: %s\n", searchBTreeWord(bTreeRoot, word) ? "Encontrada" : "Não encontrada");
+                printf("Busca por '%s': %s\n", word, searchBTree(root, word) ? "Encontrada" : "Não encontrada");
                 break;
             case 3:
                 printf("Digite o prefixo para sugerir palavras: ");
                 scanf("%s", prefix);
                 printf("Sugestões para '%s':\n", prefix);
-                suggestBTreeWords(bTreeRoot, prefix);
+                suggestBTreeWords(root, prefix, buffer, 0);
                 break;
             case 4:
+                printf("Exibindo palavras na árvore:\n");
+                printBTree(root);
+                break;
+            case 5:
                 printf("Saindo...\n");
                 return 0;
             default:
@@ -154,3 +231,4 @@ int main() {
         }
     }
 }
+
