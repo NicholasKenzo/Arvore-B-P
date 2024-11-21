@@ -1,0 +1,160 @@
+# Arvore-B-P
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define MAX_KEY_LENGTH 100
+
+// Estrutura de dados para a Árvore Patricia
+typedef struct PatriciaNode {
+    char *word;               // Palavra armazenada no nó
+    struct PatriciaNode *left; // Sub-árvore à esquerda
+    struct PatriciaNode *right; // Sub-árvore à direita
+    int split_index;          // Índice de separação entre os prefixos
+} PatriciaNode;
+
+// Função para criar um novo nó da Árvore Patricia
+PatriciaNode* createPatriciaNode(const char *word, int split_index) {
+    PatriciaNode *newNode = (PatriciaNode *)malloc(sizeof(PatriciaNode));
+    newNode->word = strdup(word);
+    newNode->split_index = split_index;
+    newNode->left = NULL;
+    newNode->right = NULL;
+    return newNode;
+}
+
+// Função de inserção na Árvore Patricia
+void insertPatriciaWord(PatriciaNode **root, const char *word) {
+    if (*root == NULL) {
+        *root = createPatriciaNode(word, 0);
+        return;
+    }
+
+    PatriciaNode *current = *root;
+    while (current != NULL) {
+        int i = 0;
+        // Comparar os prefixos até encontrar uma diferença
+        while (word[i] == current->word[i] && word[i] != '\0') {
+            i++;
+        }
+
+        if (i == 0) { // Nenhum prefixo em comum
+            if (word[0] < current->word[0]) {
+                insertPatriciaWord(&current->left, word);
+            } else {
+                insertPatriciaWord(&current->right, word);
+            }
+            return;
+        }
+
+        if (i == strlen(current->word)) { // Palavra já existente
+            if (word[i] == '\0') {
+                return; // Palavra já está na árvore
+            }
+            current = current->right; // Continue verificando
+        } else {
+            // Divide o nó no índice de separação
+            PatriciaNode *newNode = createPatriciaNode(current->word, i);
+            newNode->left = current->left;
+            newNode->right = current->right;
+            current->word = strndup(current->word, i); // Palavra até o índice i
+            current->left = newNode;
+
+            // Inserir a nova palavra após a divisão
+            if (word[i] < current->word[i]) {
+                insertPatriciaWord(&current->left, word);
+            } else {
+                insertPatriciaWord(&current->right, word);
+            }
+            return;
+        }
+    }
+}
+
+// Função de busca na Árvore Patricia
+int searchPatriciaWord(PatriciaNode *root, const char *word) {
+    if (root == NULL) {
+        return 0; // Palavra não encontrada
+    }
+
+    PatriciaNode *current = root;
+    while (current != NULL) {
+        int i = 0;
+        // Comparar os prefixos até encontrar uma diferença
+        while (word[i] == current->word[i] && word[i] != '\0') {
+            i++;
+        }
+
+        if (i == strlen(current->word)) { // Palavra encontrada
+            if (word[i] == '\0') {
+                return 1; // Palavra encontrada
+            }
+            current = current->right; // Continue verificando
+        } else {
+            return 0; // Palavra não encontrada
+        }
+    }
+    return 0;
+}
+
+// Função para imprimir sugestões de palavras na Árvore Patricia
+void printPatriciaSuggestions(PatriciaNode *root, const char *prefix) {
+    if (root == NULL) return;
+
+    // Se o nó contém uma palavra e o prefixo coincide, imprima
+    if (strstr(root->word, prefix) == root->word) {
+        printf("%s\n", root->word);
+    }
+
+    // Chamar recursivamente nos filhos
+    printPatriciaSuggestions(root->left, prefix);
+    printPatriciaSuggestions(root->right, prefix);
+}
+
+// Função de sugestão de palavras com base no prefixo na Árvore Patricia
+void suggestPatriciaWords(PatriciaNode *root, const char *prefix) {
+    printPatriciaSuggestions(root, prefix);
+}
+
+// Função Principal
+int main() {
+    PatriciaNode *patriciaRoot = NULL;
+    int choice;
+    char word[MAX_KEY_LENGTH];
+    char prefix[MAX_KEY_LENGTH];
+
+    while (1) {
+        printf("\nEscolha uma opção:\n");
+        printf("1. Inserir palavra\n");
+        printf("2. Buscar palavra\n");
+        printf("3. Sugerir palavras (autocompletar)\n");
+        printf("4. Sair\n");
+
+        scanf("%d", &choice);
+        switch (choice) {
+            case 1:
+                printf("Digite a palavra para inserir: ");
+                scanf("%s", word);
+                insertPatriciaWord(&patriciaRoot, word);
+                break;
+            case 2:
+                printf("Digite a palavra para buscar: ");
+                scanf("%s", word);
+                printf("Busca: %s\n", searchPatriciaWord(patriciaRoot, word) ? "Encontrada" : "Não encontrada");
+                break;
+            case 3:
+                printf("Digite o prefixo para sugerir palavras: ");
+                scanf("%s", prefix);
+                printf("Sugestões para '%s':\n", prefix);
+                suggestPatriciaWords(patriciaRoot, prefix);
+                break;
+            case 4:
+                printf("Saindo...\n");
+                return 0;
+            default:
+                printf("Opção inválida!\n");
+        }
+    }
+}
