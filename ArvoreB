@@ -138,36 +138,6 @@ void insertBTree(BTreeNode **root, const char *key) {
     }
 }
 
-// Função para sugerir palavras baseadas no prefixo
-void suggestBTreeWords(BTreeNode *root, const char *prefix, char *buffer, int depth) {
-    if (!root) {
-        return;
-    }
-
-    for (int i = 0; i < root->numKeys; i++) {
-        // Copiar a chave no buffer
-        strncpy(buffer + depth, root->keys[i], strlen(root->keys[i]));
-        depth += strlen(root->keys[i]);
-
-        // Se a chave começar com o prefixo
-        if (strncmp(buffer, prefix, strlen(prefix)) == 0) {
-            printf("%s\n", buffer);
-        }
-
-        // Recursão para filhos
-        if (!root->isLeaf) {
-            suggestBTreeWords(root->children[i], prefix, buffer, depth);
-        }
-
-        // Resetar o buffer de volta
-        depth -= strlen(root->keys[i]);
-    }
-
-    if (!root->isLeaf) {
-        suggestBTreeWords(root->children[root->numKeys], prefix, buffer, depth);
-    }
-}
-
 // Função para imprimir as palavras em ordem lexicográfica
 void printBTree(BTreeNode *root) {
     if (!root) {
@@ -186,13 +156,53 @@ void printBTree(BTreeNode *root) {
     }
 }
 
+// Função para ler palavras de um arquivo e inseri-las na árvore
+void readWordsFromFile(const char *filename, BTreeNode **root) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Erro ao abrir o arquivo '%s'.\n", filename);
+        return;
+    }
+
+    char word[100];
+    while (fscanf(file, "%s", word) != EOF) {
+        insertBTree(root, word);
+    }
+
+    fclose(file);
+}
+
+// Função para sugerir palavras que começam com um prefixo
+void suggestWords(BTreeNode *root, const char *prefix) {
+    if (!root) {
+        return;
+    }
+
+    // Percorrer as chaves do nó
+    for (int i = 0; i < root->numKeys; i++) {
+        // Verificar se a chave começa com o prefixo
+        if (strncmp(root->keys[i], prefix, strlen(prefix)) == 0) {
+            printf("%s\n", root->keys[i]);
+        }
+    }
+
+    // Recursão para os filhos
+    for (int i = 0; i <= root->numKeys; i++) {
+        if (!root->isLeaf) {
+            suggestWords(root->children[i], prefix);
+        }
+    }
+}
+
 // Função principal para interagir com o usuário
 int main() {
     BTreeNode *root = NULL;
     char word[100];
     char prefix[100];
-    char buffer[100];
     int choice;
+
+    // Ler palavras de um arquivo e inserir na árvore
+    readWordsFromFile("dicionario.txt", &root);
 
     while (1) {
         printf("\nEscolha uma opção:\n");
@@ -217,7 +227,7 @@ int main() {
                 printf("Digite o prefixo para sugerir palavras: ");
                 scanf("%s", prefix);
                 printf("Sugestões para '%s':\n", prefix);
-                suggestBTreeWords(root, prefix, buffer, 0);
+                suggestWords(root, prefix);
                 break;
             case 4:
                 printf("Exibindo palavras na árvore:\n");
